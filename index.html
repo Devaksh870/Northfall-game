@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>NORTHFALL — Open World</title>
+<style>
+:root{--gold:#f4a261;--dark:#101a1b;--panel:#102426d9;--white:#fff7e6}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#9dc8df;color:var(--white);font-family:system-ui,Arial,sans-serif;touch-action:none}
+#game{width:100%;height:100%;display:block}
+#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 2px 5px #0009}
+#brand{position:absolute;top:12px;left:14px;font-weight:900;letter-spacing:2px;font-size:18px}
+#sub{font-size:10px;letter-spacing:2px;color:#ffe1ad}
+#mission{position:absolute;top:13px;right:12px;background:var(--panel);border:1px solid #ffffff30;border-radius:12px;padding:9px 11px;font-size:11px;max-width:180px}
+#hint{position:absolute;left:50%;top:16%;transform:translateX(-50%);padding:8px 12px;border-radius:12px;background:#102426aa;font-size:12px;white-space:nowrap;opacity:0;transition:opacity .25s}
+#joystick{position:absolute;left:18px;bottom:24px;width:124px;height:124px;border:2px solid #ffffff9c;border-radius:50%;background:#10242665;pointer-events:auto}
+#stick{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:#fff1d9e8;box-shadow:0 3px 12px #0005}
+.btn{pointer-events:auto;position:absolute;border:1px solid #ffffffa0;background:#102426b8;color:white;font-weight:800;border-radius:50%;width:68px;height:68px}
+#jump{right:22px;bottom:112px}#run{right:92px;bottom:38px;width:56px;height:56px;font-size:10px}#menuBtn{right:24px;bottom:36px;width:56px;height:56px;font-size:10px}
+#crosshair{position:absolute;left:50%;top:50%;width:4px;height:4px;border-radius:50%;background:#fff8}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#07171977,#071719d9),linear-gradient(140deg,#315d62,#152a2b 55%,#080f11);z-index:5;padding:24px}
+.card{width:min(440px,100%);border:1px solid #f4a26188;background:#0d1b1deF;border-radius:22px;padding:26px 22px;text-align:center;box-shadow:0 20px 70px #0008}
+.emblem{font-size:43px;margin-bottom:4px}.logo{font-weight:1000;letter-spacing:5px;font-size:clamp(32px,9vw,48px);color:#ffe1a5;text-shadow:0 3px 0 #8d4e1e,0 8px 22px #000}
+.tag{font-size:10px;letter-spacing:3px;color:#b7d8cf;margin:7px 0 22px}
+#start p{font-size:13px;line-height:1.6;color:#d5e0dc}
+#play{border:0;border-radius:12px;background:linear-gradient(120deg,#ffcb7b,#ed8b3b);padding:14px 22px;font-weight:900;color:#1a2422;letter-spacing:1px;width:100%;font-size:15px}
+#start small{display:block;margin-top:13px;color:#9eb7b2;font-size:10px;line-height:1.5}
+#toast{position:fixed;left:50%;top:25%;transform:translateX(-50%);background:#102426eF;border:1px solid #f4a261aa;border-radius:12px;padding:10px 14px;font-size:12px;display:none;z-index:3;text-align:center}
+@media(min-width:800px){#joystick{width:140px;height:140px}#stick{left:43px;top:43px}#hint{top:12%}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div id="brand">NORTHFALL<div id="sub">VILLAGE · CITY · YOUR STORY</div></div>
+ <div id="mission">📍 GREEN VALLEY<br><span id="objective">Objective: Explore the village</span><br><span id="coords">X 0 · Z 0</span></div>
+ <div id="hint"></div><div id="crosshair"></div>
+ <div id="joystick"><div id="stick"></div></div>
+ <button class="btn" id="jump">JUMP</button>
+ <button class="btn" id="run">RUN</button>
+ <button class="btn" id="menuBtn">MENU</button>
+</div>
+<div id="toast"></div>
+<div id="start">
+ <div class="card">
+  <div class="emblem">🏔️</div><div class="logo">NORTHFALL</div>
+  <div class="tag">VILLAGE · CITY · YOUR STORY</div>
+  <p>Welcome to Green Valley. Explore the village, follow the road toward the city, and discover your world.</p>
+  <button id="play">ENTER THE WORLD</button>
+  <small>3D OPEN-WORLD PROTOTYPE · VERSION 0.2<br>Internet required to load the 3D engine on first launch.</small>
+ </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const canvas=document.querySelector('#game');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9dc8df);scene.fog=new THREE.Fog(0x9dc8df,75,240);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,500);
+scene.add(new THREE.HemisphereLight(0xe4f4ff,0x566447,2.1));
+const sun=new THREE.DirectionalLight(0xffe2b0,3.0);sun.position.set(-50,75,35);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;scene.add(sun);
+
+function heightAt(x,z){return Math.sin(x*.035)*1.1+Math.cos(z*.045)*.8+Math.sin((x+z)*.025)*1.1;}
+const groundGeo=new THREE.PlaneGeometry(360,360,100,100);groundGeo.rotateX(-Math.PI/2);const pp=groundGeo.attributes.position;
+for(let i=0;i<pp.count;i++){const x=pp.getX(i),z=pp.getZ(i);pp.setY(i,heightAt(x,z));}groundGeo.computeVertexNormals();
+const ground=new THREE.Mesh(groundGeo,new THREE.MeshStandardMaterial({color:0x63864a,roughness:1}));ground.receiveShadow=true;scene.add(ground);
+
+let seed=87261;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+const mat=(color,roughness=1,extra={})=>new THREE.MeshStandardMaterial({color,roughness,...extra});
+const trunkMat=mat(0x68452b),leafMats=[mat(0x2f623b),mat(0x427644),mat(0x567f43),mat(0x315736)];
+const rockMat=mat(0x81847b);
+function tree(x,z,s=1){
+ const y=heightAt(x,z),g=new THREE.Group();
+ const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18*s,.28*s,2*s,7),trunkMat);trunk.position.y=y+s;trunk.castShadow=true;g.add(trunk);
+ const crown=new THREE.Mesh(new THREE.ConeGeometry(1.2*s,2.8*s,7),leafMats[Math.floor(rand()*leafMats.length)]);crown.position.y=y+2.5*s;crown.castShadow=true;g.add(crown);
+ const crown2=new THREE.Mesh(new THREE.ConeGeometry(.82*s,2.1*s,7),leafMats[Math.floor(rand()*leafMats.length)]);crown2.position.set(.15*s,y+3.15*s,0);g.add(crown2);g.position.set(x,0,z);scene.add(g);
+}
+for(let i=0;i<270;i++){let x=(rand()-.5)*290,z=(rand()-.5)*290;if(Math.abs(x)<22&&z>-45&&z<22)continue;if(Math.hypot(x-45,z+40)<22)continue;tree(x,z,.65+rand()*.8);}
+for(let i=0;i<65;i++){let x=(rand()-.5)*250,z=(rand()-.5)*250;if(Math.hypot(x,z)<18)continue;let r=new THREE.Mesh(new THREE.DodecahedronGeometry(.5+rand()*1.2),rockMat);r.position.set(x,heightAt(x,z)+.25,z);r.scale.y=.6+rand();r.rotation.set(rand(),rand(),rand());r.castShadow=true;scene.add(r);}
+
+// Distant mountains
+for(let i=0;i<32;i++){let a=i/32*Math.PI*2,r=145+(i%4)*9,h=18+(i%6)*5;let m=new THREE.Mesh(new THREE.ConeGeometry(14+(i%5)*3,h,7),mat([0x718b7a,0x849987,0x657e70][i%3]));m.position.set(Math.cos(a)*r,h/2-2,Math.sin(a)*r);m.rotation.y=a;scene.add(m);}
+
+// River and banks
+const riverMat=mat(0x378eac,.22,{metalness:.1,transparent:true,opacity:.94});
+const river=new THREE.Mesh(new THREE.PlaneGeometry(17,125),riverMat);river.rotation.x=-Math.PI/2;river.position.set(47,.15,-60);river.rotation.z=-.16;scene.add(river);
+const bankMat=mat(0xc0b17e);
+for(let side of [-1,1]){let bank=new THREE.Mesh(new THREE.PlaneGeometry(2,128),bankMat);bank.rotation.x=-Math.PI/2;bank.rotation.z=-.16;bank.position.set(47+side*9,.12,-60);scene.add(bank);}
+
+// Road leading village to city
+const roadMat=mat(0x5c5548),lineMat=mat(0xe8d9a9);
+function roadSegment(x,z,w,l,rot=0){
+ let road=new THREE.Mesh(new THREE.PlaneGeometry(w,l),roadMat);road.rotation.x=-Math.PI/2;road.rotation.z=rot;road.position.set(x,heightAt(x,z)+.06,z);road.receiveShadow=true;scene.add(road);
+ for(let d=-l/2+3;d<l/2;d+=8){let dash=new THREE.Mesh(new THREE.PlaneGeometry(.18,3),lineMat);dash.rotation.x=-Math.PI/2;dash.rotation.z=rot;dash.position.set(x+Math.sin(rot)*d,heightAt(x,z)+.075,z+Math.cos(rot)*d);scene.add(dash);}
+}
+roadSegment(0,-33,9,105,0);
+roadSegment(0,-88,9,70,0);
+// houses and city buildings
+function house(x,z,scale=1,paint=0xc88752,roofColor=0x8c4931){
+ const y=heightAt(x,z),g=new THREE.Group(),wall=mat(paint),roofM=mat(roofColor),dark=mat(0x473329),windowM=mat(0x8bc7d3,.3,{emissive:0x142c32});
+ const w=5*scale,h=3.1*scale,d=4.5*scale;
+ const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wall);body.position.y=y+h/2;body.castShadow=true;body.receiveShadow=true;g.add(body);
+ const roof=new THREE.Mesh(new THREE.ConeGeometry(4.3*scale,1.8*scale,4),roofM);roof.position.y=y+h+.7*scale;roof.rotation.y=Math.PI/4;roof.scale.z=.82;roof.castShadow=true;g.add(roof);
+ const door=new THREE.Mesh(new THREE.BoxGeometry(.85*scale,1.9*scale,.12),dark);door.position.set(0,y+.95*scale,d/2+.07);g.add(door);
+ for(let sx of [-1.35,1.35]){let win=new THREE.Mesh(new THREE.BoxGeometry(.8*scale,.75*scale,.1),windowM);win.position.set(sx*scale,y+2*scale,d/2+.08);g.add(win);}
+ g.position.set(x,0,z);scene.add(g);
+}
+for(let i=0;i<19;i++){let x=(i%5-2)*10+(rand()-.5)*2,z=8+Math.floor(i/5)*10+(rand()-.5)*2;if(Math.abs(x)<5)continue;house(x,z,.8+rand()*.35,[0xd4ad7d,0xc88659,0xd9c8a2,0xb7a17e][i%4],[0x8c4931,0x9b6242,0x6d5544][i%3]);}
+// City skyline
+for(let i=0;i<28;i++){let x=-28+(i%7)*9,z=-110-Math.floor(i/7)*12,w=4+rand()*4,d=4+rand()*5,h=10+rand()*35;let b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0x77858a,0x9a9a8c,0x657c85,0xb3a18c][i%4],.75,{metalness:.12}));b.position.set(x,heightAt(x,z)+h/2,z);b.castShadow=true;b.receiveShadow=true;scene.add(b);for(let yy=3;yy<h-2;yy+=3)for(let xx=-w/2+.8;xx<w/2;xx+=1.6){let win=new THREE.Mesh(new THREE.BoxGeometry(.65,.8,.04),mat(0xe9cf8c,.4,{emissive:0x33260f}));win.position.set(x+xx,heightAt(x,z)+yy,z+d/2+.025);scene.add(win);}}
+
+// Small lake
+const lake=new THREE.Mesh(new THREE.CircleGeometry(10,40),mat(0x358eae,.2,{metalness:.12}));lake.rotation.x=-Math.PI/2;lake.position.set(-23,heightAt(-23,-16)+.12,-16);lake.scale.set(1.3,.8,1);scene.add(lake);
+
+// Player model
+const player=new THREE.Group();const shirt=mat(0x315e9a),pants=mat(0x30353c),skin=mat(0xc58e68),shoe=mat(0x252525);
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.72,4,8),shirt);torso.position.y=1.35;torso.castShadow=true;player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.31,14,12),skin);head.position.y=2.08;head.castShadow=true;player.add(head);
+const limbs=[];
+for(const x of [-.22,.22]){let leg=new THREE.Mesh(new THREE.CapsuleGeometry(.14,.57,3,7),pants);leg.position.set(x,.48,0);player.add(leg);limbs.push({mesh:leg,phase:x<0?0:Math.PI});let boot=new THREE.Mesh(new THREE.BoxGeometry(.3,.15,.42),shoe);boot.position.set(x,.12,-.08);player.add(boot);}
+for(const x of [-.53,.53]){let arm=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.55,3,7),shirt);arm.position.set(x,1.34,0);player.add(arm);limbs.push({mesh:arm,phase:x<0?Math.PI:0});}
+player.position.set(0,heightAt(0,0),0);scene.add(player);
+
+// Destination marker near village square
+const marker=new THREE.Mesh(new THREE.TorusGeometry(1.25,.09,8,24),mat(0xffd16c,.4,{emissive:0x63400b}));marker.rotation.x=Math.PI/2;marker.position.set(0,heightAt(0,8)+.15,8);scene.add(marker);
+const markerBeam=new THREE.Mesh(new THREE.CylinderGeometry(.06,.35,4,10,1,true),new THREE.MeshBasicMaterial({color:0xffd16c,transparent:true,opacity:.25}));markerBeam.position.set(0,heightAt(0,8)+2.1,8);scene.add(markerBeam);
+
+// Controls
+let yaw=0,pitch=.18,moveX=0,moveZ=0,vertical=0,onGround=true,running=false,started=false;
+const keys={};window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space')jump();});window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function jump(){if(onGround){vertical=7.2;onGround=false;}}
+document.querySelector('#jump').addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+document.querySelector('#run').addEventListener('pointerdown',e=>{e.preventDefault();running=!running;document.querySelector('#run').style.background=running?'#bd7730':'#102426b8';});
+const joy=document.querySelector('#joystick'),stick=document.querySelector('#stick');let joyId=null;
+function joyMove(e){const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=38,len=Math.hypot(dx,dy);let x=dx,y=dy;if(len>max){x=x/len*max;y=y/len*max;}stick.style.left=(36+x)+'px';stick.style.top=(36+y)+'px';moveX=x/max;moveZ=y/max;}
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joyMove(e);});joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e);});
+function joyEnd(e){if(e.pointerId===joyId){joyId=null;moveX=moveZ=0;stick.style.left='36px';stick.style.top='36px';}}
+joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+// Camera look drag: drag on the right side of screen
+let lookId=null,lastX=0,lastY=0;canvas.addEventListener('pointerdown',e=>{if(e.clientX>innerWidth*.42){lookId=e.pointerId;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);}});
+canvas.addEventListener('pointermove',e=>{if(e.pointerId===lookId){yaw-=(e.clientX-lastX)*.006;pitch=Math.max(-.05,Math.min(.72,pitch+(e.clientY-lastY)*.003));lastX=e.clientX;lastY=e.clientY;}});
+function lookEnd(e){if(e.pointerId===lookId)lookId=null;}canvas.addEventListener('pointerup',lookEnd);canvas.addEventListener('pointercancel',lookEnd);
+
+function toast(msg){const el=document.querySelector('#toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display='none',2300);}
+document.querySelector('#play').addEventListener('click',()=>{document.querySelector('#start').style.display='none';started=true;toast('Welcome to Northfall. Explore the village!');});
+document.querySelector('#menuBtn').addEventListener('click',()=>{document.querySelector('#start').style.display='flex';});
+const clock=new THREE.Clock();let walked=0;
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);let ix=moveX,iz=moveZ;
+if(keys.a||keys.arrowleft)ix=-1;if(keys.d||keys.arrowright)ix=1;if(keys.w||keys.arrowup)iz=-1;if(keys.s||keys.arrowdown)iz=1;
+const l=Math.hypot(ix,iz);if(l>1){ix/=l;iz/=l;}
+const speed=running?9:5.5,fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
+if(started){player.position.x+=(rx*ix+fx*(-iz))*speed*dt;player.position.z+=(rz*ix+fz*(-iz))*speed*dt;}
+player.position.x=Math.max(-165,Math.min(165,player.position.x));player.position.z=Math.max(-165,Math.min(165,player.position.z));
+const gy=heightAt(player.position.x,player.position.z);vertical-=18*dt;player.position.y+=vertical*dt;if(player.position.y<=gy){player.position.y=gy;vertical=0;onGround=true;}
+if(l>.08){player.rotation.y=Math.atan2(rx*ix+fx*(-iz),rz*ix+fz*(-iz));walked+=dt*speed;limbs.forEach(o=>o.mesh.rotation.x=Math.sin(walked*1.6+o.phase)*.48);}
+else limbs.forEach(o=>o.mesh.rotation.x*=.8);
+const target=new THREE.Vector3(player.position.x,player.position.y+1.45,player.position.z);
+const dist=8.2,off=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch)*dist,2.8+pitch*2.5,Math.cos(yaw)*Math.cos(pitch)*dist);
+camera.position.lerp(target.clone().add(off),1-Math.pow(.001,dt));camera.lookAt(target);
+marker.rotation.z+=dt*.7;marker.position.y=heightAt(0,8)+.18+Math.sin(performance.now()*.002)*.2;markerBeam.position.y=heightAt(0,8)+2.1;
+const distHome=Math.hypot(player.position.x,player.position.z-8);const distCity=Math.hypot(player.position.x,player.position.z+100);
+document.querySelector('#coords').textContent=`X ${player.position.x.toFixed(0)} · Z ${player.position.z.toFixed(0)}`;
+document.querySelector('#objective').textContent=distHome<8?'Objective: Explore the village':distCity<30?'Objective: You reached the city edge':'Objective: Explore the village and road';
+renderer.render(scene,camera);}
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));}
+window.addEventListener('resize',resize);animate();
+</script>
+</body>
+</html>
